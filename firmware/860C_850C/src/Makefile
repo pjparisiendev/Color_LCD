@@ -26,7 +26,7 @@ ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
   TARGET_LFLAGS = -Xlinker --defsym=RESERVE_SETTINGS_PAGES=1
   TARGET_CPU = cortex-m4
   TARGET_CMSIS_INCLUDES = -I./gd32f30x_cmsis/Include -I./gd32f30x_cmsis/Core
-  TARGET_SYSTEM_SOURCE = gd32f30x_cmsis/system_gd32f30x.c gd32f30x_cmsis/gd32f30x_adc.c gd32f30x_cmsis/gd32f30x_dma.c gd32f30x_cmsis/gd32f30x_gpio.c gd32f30x_cmsis/gd32f30x_misc.c gd32f30x_cmsis/gd32f30x_rcu.c gd32f30x_cmsis/gd32f30x_timer.c gd32f30x_cmsis/gd32f30x_usart.c gd32f30x_cmsis/gd32f30x_fmc.c
+  TARGET_SYSTEM_SOURCE = gd32f30x_cmsis/system_gd32f30x.c gd32f30x_cmsis/gd32f30x_adc.c gd32f30x_cmsis/gd32f30x_dma.c gd32f30x_cmsis/gd32f30x_gpio.c gd32f30x_cmsis/gd32f30x_misc.c gd32f30x_cmsis/gd32f30x_rcu.c gd32f30x_cmsis/gd32f30x_timer.c gd32f30x_cmsis/gd32f30x_usart.c
   TARGET_STARTUP_OBJECT = startup_gd32f30x_hd.o
   DISPLAY_VERSION_DEFINED = yes
   $(warning DEVELOPMENT ONLY: GD32F303 target uses working BIKEL 850C hardware assumptions)
@@ -127,7 +127,7 @@ startup_stm32f10x_md.o:
 	$(AS) $(ASFLAGS) startup_stm32f10x_md.s -o startup_stm32f10x_md.o
 
 startup_gd32f30x_hd.o:
-	$(CC) $(CFLAGS) -x assembler-with-cpp -c gd32f30x_cmsis/startup_gd32f30x_hd.s -o startup_gd32f30x_hd.o
+	$(CC) $(CFLAGS) -x assembler-with-cpp -c gd32f30x_cmsis/startup_gd32f30x_hd.S -o startup_gd32f30x_hd.o
 
 DEPDIR := .deps
 DEPFLAGS = -MT $@ -MD -MP -MF $(DEPDIR)/$*.d
