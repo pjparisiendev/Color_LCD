@@ -23,9 +23,6 @@
 #include "state.h"
 #include "timers.h"
 #include "ugui_driver/ugui_display_8x0c.h"
-#ifdef TARGET_APT_850C_GD32F303RET6
-#include "lcd_lf60.h"
-#endif
 
 #define BATTERY_SOC_START_X 8
 #define BATTERY_SOC_START_Y 4
@@ -49,16 +46,14 @@ void power_off_management(void);
 
 void lcd_init(void)
 {
-#ifdef TARGET_APT_850C_GD32F303RET6
-  /* Do not run the historical LB60/ILI9481 autodetection path on the E2.3
-   * target. Use the exact LF60 sequence copied from the working BIKEL 850C.
-   */
-  g_lcd_ic_type = lcd_lf60_init();
-#else
+  /* The full display initializer now contains the native GD32 bus setup and
+   * the BIKEL LF60 command sequence for this target. Calling it is essential:
+   * after panel setup it also runs UG_Init() and registers the accelerated
+   * uGUI drawing drivers. The previous direct lcd_lf60_init() path skipped
+   * those registrations, so UG_FillScreen() ran with an uninitialized GUI. */
   g_lcd_ic_type = display_8x0C_lcd_init();
-#endif
-  UG_FillScreen(C_BLACK);
 
+  UG_FillScreen(C_BLACK);
   set_lcd_backlight();
 }
 
@@ -105,7 +100,9 @@ void lcd_power_off(uint8_t updateDistanceOdo)
 
   system_power(0);
 
-  while(1) ;
+  while(1)
+  {
+  }
 }
 
 volatile lcd_vars_t* get_lcd_vars(void)
