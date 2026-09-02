@@ -66,5 +66,6 @@
 
 void pins_init(void);
 void system_power(uint32_t ui32_state);
+void power_latch_test_run(void);
 
 #endif /* PINS_H_ */
