@@ -30,6 +30,48 @@ typedef char apt_pin_map_preserves_swd[
     (((PA_OUTPUTS | PA_INPUTS) & (GPIO_PIN_13 | GPIO_PIN_14)) == 0U) ? 1 : -1];
 #endif
 
+void power_latch_test_run(void)
+{
+#ifdef TARGET_APT_850C_GD32F303RET6
+  /* Deliberately bypass the normal platform/LCD/application initialization.
+   * If execution reaches here, prove it by latching PC1 HIGH and blinking the
+   * PA7 backlight pin forever using GPIO only. */
+  rcu_periph_clock_enable(RCU_GPIOA);
+  rcu_periph_clock_enable(RCU_GPIOC);
+
+  gpio_init(GPIOC, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_1);
+  gpio_bit_reset(GPIOC, GPIO_PIN_1);
+
+  for (volatile uint32_t i = 0U; i < 100000U; i++)
+  {
+    __NOP();
+  }
+
+  gpio_bit_set(GPIOC, GPIO_PIN_1);
+
+  gpio_init(GPIOA, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_7);
+
+  while (1)
+  {
+    gpio_bit_set(GPIOA, GPIO_PIN_7);
+    for (volatile uint32_t i = 0U; i < 8000000U; i++)
+    {
+      __NOP();
+    }
+
+    gpio_bit_reset(GPIOA, GPIO_PIN_7);
+    for (volatile uint32_t i = 0U; i < 8000000U; i++)
+    {
+      __NOP();
+    }
+  }
+#else
+  while (1)
+  {
+  }
+#endif
+}
+
 void pins_init (void)
 {
 #ifdef TARGET_APT_850C_GD32F303RET6
