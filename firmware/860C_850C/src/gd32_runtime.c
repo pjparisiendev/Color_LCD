@@ -7,9 +7,7 @@
 void gd32_platform_early_init(void)
 {
   /* Match the clocking used by the known-working BIKEL 850C firmware:
-   * 8 MHz HSE x 13 = 104 MHz, AHB = SYSCLK, APB2 = HCLK, APB1 = HCLK/2.
-   * Keep this in the native GD32 layer so the F303 target does not depend on
-   * STM32F10x clock setup code.
+   * 8 MHz HXTAL x 13 = 104 MHz, AHB = SYSCLK, APB2 = HCLK, APB1 = HCLK/2.
    */
   rcu_deinit();
   rcu_osci_on(RCU_HXTAL);
@@ -20,13 +18,15 @@ void gd32_platform_early_init(void)
     }
   }
 
-  fmc_wscnt_set(WS_WSCNT_2);
+  /* Two FMC wait states, matching the working firmware's flash latency. */
+  FMC_WS = (FMC_WS & ~FMC_WS_WSCNT) | WS_WSCNT_2;
 
   rcu_ahb_clock_config(RCU_AHB_CKSYS_DIV1);
   rcu_apb2_clock_config(RCU_APB2_CKAHB_DIV1);
   rcu_apb1_clock_config(RCU_APB1_CKAHB_DIV2);
 
-  rcu_pll_config(RCU_PLLSRC_HXTAL, RCU_PLL_MUL13);
+  rcu_pllpresel_config(RCU_PLLPRESRC_HXTAL);
+  rcu_pll_config(RCU_PLLSRC_HXTAL_IRC48M, RCU_PLL_MUL13);
   rcu_osci_on(RCU_PLL_CK);
   if (SUCCESS != rcu_osci_stab_wait(RCU_PLL_CK))
   {
@@ -44,15 +44,12 @@ void gd32_platform_early_init(void)
 
   rcu_periph_reset_disable(RCU_WWDGTRST);
 
-  /* Known-working MPe 850C builds reserve the first 20 KiB for the
-   * manufacturer's APT bootloader and relocate vectors to 0x08005000.
-   */
+  /* Working BIKEL 850C application layout: 20 KiB APT bootloader prefix. */
   SCB->VTOR = 0x08005000U;
   __DSB();
   __ISB();
 }
 
-/* Required by the official GD32 GCC startup before main(). */
 void _init(void)
 {
 }
