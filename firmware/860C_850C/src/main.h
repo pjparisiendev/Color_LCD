@@ -1,5 +1,5 @@
 /*
- * Bafang LCD 860C/850C firmware
+ * LCD3 firmware
  *
  * Copyright (C) Casainho, 2018, 2019, 2020
  *
@@ -9,10 +9,18 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
+#include "timers.h"
+
+// INTERRUPTS PRIORITIES
+// Define for the NVIC IRQChannel Preemption Priority
+// lower number has higher priority
 #define USART1_INTERRUPT_PRIORITY       3
 #define USART1_DMA_INTERRUPT_PRIORITY   4
 #define TIM4_INTERRUPT_PRIORITY         5
 #define RTC_INTERRUT_PRIORITY           6
+
+//#define  MAIN_SCREEN_FIELD_LABELS_COLOR C_GRAY
+#define  MAIN_SCREEN_FIELD_LABELS_COLOR C_WHITE_SMOKE
 
 #if defined(TARGET_APT_850C_GD32F303RET6) && !defined(DISPLAY_850C_LF60)
 #define DISPLAY_850C_LF60
