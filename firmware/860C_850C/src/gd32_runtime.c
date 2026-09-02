@@ -18,7 +18,6 @@ void gd32_platform_early_init(void)
     }
   }
 
-  /* Two FMC wait states, matching the working firmware's flash latency. */
   FMC_WS = (FMC_WS & ~FMC_WS_WSCNT) | WS_WSCNT_2;
 
   rcu_ahb_clock_config(RCU_AHB_CKSYS_DIV1);
@@ -44,8 +43,11 @@ void gd32_platform_early_init(void)
 
   rcu_periph_reset_disable(RCU_WWDGTRST);
 
-  /* Working BIKEL 850C application layout: 20 KiB APT bootloader prefix. */
-  SCB->VTOR = 0x08005000U;
+  /* The actual E2.3 updater capture and known-good factory image establish
+   * the application/vector origin at 0x08004000. Keep that hardware-proven
+   * boundary even though older BIKEL source comments describe 0x5000.
+   */
+  SCB->VTOR = 0x08004000U;
   __DSB();
   __ISB();
 }
