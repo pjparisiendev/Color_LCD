@@ -1,5 +1,5 @@
 /*
- * LCD3 firmware
+ * Bafang LCD 860C/850C firmware
  *
  * Copyright (C) Casainho, 2018, 2019, 2020
  *
@@ -9,19 +9,11 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
-#include "timers.h"
-
-// INTERRUPTS PRIORITIES
-// Define for the NVIC IRQChannel Preemption Priority
-// lower number has higher priority
-#define USART1_INTERRUPT_PRIORITY       3
-#define USART1_DMA_INTERRUPT_PRIORITY   4
-#define TIM4_INTERRUPT_PRIORITY         5
-#define RTC_INTERRUT_PRIORITY           6
-
-
-
-//#define  MAIN_SCREEN_FIELD_LABELS_COLOR C_GRAY
-#define  MAIN_SCREEN_FIELD_LABELS_COLOR C_WHITE_SMOKE
+/* The E2.3/GD32 target uses the newer 850C LF60 panel path proven by the
+ * working BIKEL 850C v1.1 binary. Legacy builds keep their historical defines.
+ */
+#if defined(TARGET_APT_850C_GD32F303RET6) && !defined(DISPLAY_850C_LF60)
+#define DISPLAY_850C_LF60
+#endif
 
 #endif // _MAIN_H_
