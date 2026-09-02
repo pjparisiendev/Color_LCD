@@ -163,6 +163,56 @@ lcd_IC_t display_8x0C_lcd_init(void) {
     lcd_IC_t type = LCD_Unknown;
 //#ifdef DISPLAY_850C
 #ifdef DISPLAY_850C_LF60
+    /* Exact active LF60 initialization captured in the BIKEL 1.1 source.
+     * Its released 850C binary is proven on this physical E2.3 display. */
+    delay_ms(120);
+
+    lcd_write_command(0xE0);
+    { const uint8_t data[] = {0x00,0x07,0x0F,0x07,0x15,0x09,0x3C,0x99,0x4B,0x09,0x10,0x0D,0x1C,0x1E,0x0F};
+      for (uint32_t i = 0; i < sizeof(data); i++) { lcd_write_data_8bits(data[i]); } }
+    lcd_write_command(0xE1);
+    { const uint8_t data[] = {0x00,0x20,0x23,0x02,0x0F,0x06,0x34,0x45,0x43,0x04,0x0A,0x08,0x30,0x37,0x0F};
+      for (uint32_t i = 0; i < sizeof(data); i++) { lcd_write_data_8bits(data[i]); } }
+    lcd_write_command(0xC0);
+    lcd_write_data_8bits(0x01);
+    lcd_write_data_8bits(0x01);
+    lcd_write_command(0xC1);
+    lcd_write_data_8bits(0x41);
+    lcd_write_command(0xC5);
+    lcd_write_data_8bits(0x00);
+    lcd_write_data_8bits(0x3F);
+    lcd_write_data_8bits(0x80);
+    lcd_write_command(0x36);
+    lcd_write_data_8bits(0x48);
+    lcd_write_command(0x3A);
+    lcd_write_data_8bits(0x55);
+    lcd_write_command(0xB0);
+    lcd_write_data_8bits(0x00);
+    lcd_write_command(0xB1);
+    lcd_write_data_8bits(0xA0);
+    lcd_write_data_8bits(0x11);
+    lcd_write_command(0xB4);
+    lcd_write_data_8bits(0x02);
+    lcd_write_command(0xB6);
+    lcd_write_data_8bits(0x02);
+    lcd_write_data_8bits(0x02);
+    lcd_write_command(0xBE);
+    lcd_write_data_8bits(0x00);
+    lcd_write_data_8bits(0x04);
+    lcd_write_command(0xE9);
+    lcd_write_data_8bits(0x00);
+    lcd_write_command(0xF7);
+    lcd_write_data_8bits(0xA9);
+    lcd_write_data_8bits(0x51);
+    lcd_write_data_8bits(0x2C);
+    lcd_write_data_8bits(0x8A);
+    lcd_write_command(0x11);
+    delay_ms(120);
+    lcd_write_command(0x29);
+    lcd_write_command(0x36);
+    lcd_write_data_8bits(0x48);
+    type = LCD_ST7796;
+#elif defined(DISPLAY_850C_LF60_LEGACY)
     // Configure ILI9481 display
     // borrowed from https://github.com/Bodmer/TFT_HX8357_Due/blob/master/TFT_HX8357_Due.cpp as a starting point
     type = detect_lcd_type();

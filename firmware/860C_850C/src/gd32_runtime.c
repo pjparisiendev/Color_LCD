@@ -43,11 +43,9 @@ void gd32_platform_early_init(void)
 
   rcu_periph_reset_disable(RCU_WWDGTRST);
 
-  /* The actual E2.3 updater capture and known-good factory image establish
-   * the application/vector origin at 0x08004000. Keep that hardware-proven
-   * boundary even though older BIKEL source comments describe 0x5000.
-   */
-  SCB->VTOR = 0x08004000U;
+  /* The BIKEL 1.1 850C binary physically works on this exact HMI and its
+   * linker configuration places the raw application's vector table here. */
+  SCB->VTOR = 0x08005000U;
   __DSB();
   __ISB();
 }

@@ -19,8 +19,8 @@ endif
 
 # Confirmed Green Pedel E2.3 hardware. Reuse the newer LF60 panel path and
 # 104 MHz clock behavior from the BIKEL firmware that works on this HMI, while
-# retaining the E2.3 application origin proven by the APT updater capture:
-# byte zero of the raw application image is written to 0x08004000.
+# using the 20 KiB application origin from the physically proven BIKEL 1.1
+# 850C release and its bootloader linker configuration.
 ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
   CFLAGS += -DDISPLAY_850C -DDISPLAY_850C_LF60 -DTARGET_APT_850C_GD32F303RET6 -DGD32F30X_HD -DCONTROLLER_TX_LOCKED
   BOOTLOADER = yes
@@ -30,7 +30,7 @@ ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
   TARGET_SYSTEM_SOURCE = gd32f30x_cmsis/system_gd32f30x.c gd32f30x_cmsis/gd32f30x_adc.c gd32f30x_cmsis/gd32f30x_dma.c gd32f30x_cmsis/gd32f30x_gpio.c gd32f30x_cmsis/gd32f30x_misc.c gd32f30x_cmsis/gd32f30x_rcu.c gd32f30x_cmsis/gd32f30x_timer.c gd32f30x_cmsis/gd32f30x_usart.c
   TARGET_STARTUP_OBJECT = startup_gd32f30x_hd.o
   DISPLAY_VERSION_DEFINED = yes
-  $(warning DEVELOPMENT ONLY: GD32F303 target uses working BIKEL LF60/clock assumptions with E2.3 0x08004000 origin)
+  $(warning DEVELOPMENT ONLY: GD32F303 target uses working BIKEL LF60/clock assumptions with 0x08005000 origin)
 endif
 
 TARGET_CPU ?= cortex-m3
@@ -56,7 +56,7 @@ else
   $(info WARNING | using display version: 860C_BOOTLOADER)
   endif
   ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
-  $(info WARNING | target: APT_850C_GD32F303RET6 at E2.3 offset 0x4000, LF60 LCD)
+  $(info WARNING | target: APT_850C_GD32F303RET6 at offset 0x5000, LF60 LCD)
   endif
 endif
 
