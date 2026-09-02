@@ -63,6 +63,12 @@ int main(void)
 #ifdef LCD_BRINGUP_DIAGNOSTIC
   timer3_init();
   lcd_init();
+
+  /* Diagnostic builds skip EEPROM/UI state initialization, so do not depend
+   * on set_lcd_backlight() finding a valid saved brightness. Force the same
+   * PA7 PWM channel fully visible before drawing test colors. */
+  lcd_set_backlight_intensity(100U);
+
   while (1)
   {
     UG_FillScreen(C_RED);
