@@ -4,7 +4,9 @@
  * Copyright (C) Casainho, 2018.
  *
  * Released under the GPL License, Version 3
- */
+*/
+
+#include <stdint.h>
 
 #ifndef _UTILS_H
 #define _UTILS_H

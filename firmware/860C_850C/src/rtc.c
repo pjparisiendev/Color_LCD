@@ -8,7 +8,11 @@
 
 #include "stdio.h"
 #include "main.h"
+#ifndef TARGET_APT_850C_GD32F303RET6
 #include "stm32f10x_bkp.h"
+#else
+#include "gd32_rtc_platform.h"
+#endif
 #include "rtc.h"
 
 #define SECONDS_IN_DAY 86399
@@ -19,15 +23,23 @@ uint32_t ui32_seconds_since_startup = 0;
 
 void RTC_IRQHandler(void)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  gd32_rtc_clear_second_irq();
+#else
   NVIC_ClearPendingIRQ(RTC_IRQn);
   RTC_ClearITPendingBit(RTC_IT_SEC);
+#endif
 
   // reset counter if more than 1 day passed in power down/Low Power Mode
   if((RTC_GetCounter() / SECONDS_IN_DAY) != 0)
   {
+#ifdef TARGET_APT_850C_GD32F303RET6
+    gd32_rtc_counter_set(RTC_GetCounter() % SECONDS_IN_DAY);
+#else
     RTC_WaitForLastTask();
     RTC_SetCounter(RTC_GetCounter() % SECONDS_IN_DAY);
     RTC_WaitForLastTask();
+#endif
   }
 
   ui32_seconds_since_startup++;
@@ -35,6 +47,9 @@ void RTC_IRQHandler(void)
 
 void rtc_init()
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  (void)gd32_rtc_platform_init();
+#else
   NVIC_InitTypeDef NVIC_InitStructure;
   uint16_t WaitForOscSource;
 
@@ -117,13 +132,19 @@ void rtc_init()
   }
 
   BKP_RTCOutputConfig(BKP_RTCOutputSource_None);
+#endif
 }
 
 void rtc_set_time(rtc_time_t *rtc_time)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  gd32_rtc_counter_set((((uint32_t) rtc_time->ui8_hours) * 3600U) +
+      (((uint32_t) rtc_time->ui8_minutes) * 60U));
+#else
   RTC_WaitForLastTask();
   RTC_SetCounter((((uint32_t) rtc_time->ui8_hours) * 3600) + (((uint32_t) rtc_time->ui8_minutes) * 60));
   RTC_WaitForLastTask();
+#endif
 }
 
 rtc_time_t* rtc_get_time(void)
@@ -149,3 +170,10 @@ rtc_time_t* rtc_get_time_since_startup(void)
 
   return &rtc_time;
 }
+
+#ifdef TARGET_APT_850C_GD32F303RET6
+uint32_t RTC_GetCounter(void)
+{
+  return gd32_rtc_counter_get();
+}
+#endif

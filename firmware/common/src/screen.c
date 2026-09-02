@@ -38,7 +38,7 @@ volatile bool g_graphs_ui_update[3] = { false, false, false };
 variables_t g_vars[VARS_SIZE];
 #ifndef SW102
 GraphVars g_graphVars[VARS_SIZE];
-GraphData g_graphData[VARS_SIZE][3];
+GraphData g_graphData[1][3];
 #endif
 
 extern UG_GUI gui;
@@ -2226,8 +2226,9 @@ void updateGraphData(uint8_t index, uint16_t sumDivisor) {
   // for now, reference the graphs global to find all possible data sources
   extern Field *activeGraphs;
 
-  for (int i = 0; activeGraphs->customizable.choices[i]; i++) {
-    Field *f = activeGraphs->customizable.choices[i];
+  uint8_t selected = *activeGraphs->customizable.selector;
+  Field *f = activeGraphs->customizable.choices[selected];
+  if (f) {
     GraphData *graphData = f->rw->graph.data[index];
     assert(graphData); // better be !NULL by now or we screwed up
 
@@ -2338,15 +2339,31 @@ void updateGraphData(uint8_t index, uint16_t sumDivisor) {
 }
 void rt_graph_process(void) {
 #ifndef SW102
-  static int numGraphs = 0;
   static uint32_t counter_1 = 0;
   static uint16_t counter_2[3] = {0, 0 , 0};
+  static uint8_t previous_selector = UINT8_MAX;
 
   // for now, reference the graphs global to find all possible data sources
   extern Field *activeGraphs;
 
   // start update graphs only after a startup delay to avoid wrong values of the variables
   if (activeGraphs) {
+    uint8_t selected = *activeGraphs->customizable.selector;
+    Field *f = activeGraphs->customizable.choices[selected];
+    if (!f) return;
+
+    if (selected != previous_selector) {
+      previous_selector = selected;
+      for (uint8_t j = 0; j < 3; j++) {
+        memset(&g_graphData[0][j], 0, sizeof(GraphData));
+        g_graphData[0][j].max_val = INT32_MIN;
+        g_graphData[0][j].min_val = INT32_MAX;
+        f->rw->graph.data[j] = &g_graphData[0][j];
+        counter_2[j] = 0;
+      }
+      counter_1 = 0;
+    }
+
     // track the number of data process cycles
     counter_1++;
     counter_2[0]++;
@@ -2354,26 +2371,12 @@ void rt_graph_process(void) {
     counter_2[2]++;
 
     // keep summing every 100ms
-    for (int i = 0; activeGraphs->customizable.choices[i]; i++) {
-    	Field *f = activeGraphs->customizable.choices[i];
-    	assert(f->variant == FieldGraph);
-
-    	// Select a data pool from our cache
-    	if(!f->rw->graph.data[0]) {
-        assert(numGraphs < VARS_SIZE);
-        f->rw->graph.data[0] = &g_graphData[numGraphs][0];
-        f->rw->graph.data[1] = &g_graphData[numGraphs][1];
-        f->rw->graph.data[2] = &g_graphData[numGraphs][2];
-        numGraphs++;
-    	}
-
-    	Field *fieldGraphEditable = f->graph.source; // get the backing data source for this graph
-
-    	int32_t target = getEditableNumber(fieldGraphEditable, true);
-    	f->rw->graph.data[0]->sum += target;
-    	f->rw->graph.data[1]->sum += target;
-    	f->rw->graph.data[2]->sum += target;
-    }
+    assert(f->variant == FieldGraph);
+    Field *fieldGraphEditable = f->graph.source;
+    int32_t target = getEditableNumber(fieldGraphEditable, true);
+    f->rw->graph.data[0]->sum += target;
+    f->rw->graph.data[1]->sum += target;
+    f->rw->graph.data[2]->sum += target;
 
     // @casainho if you define something like NUM_TIMESCALES 3 (see my comment in screen.h), you don't need to do this copypasta and can instead just have one bit of code
     // inside of a loop.  Which also has the nice property of letting you at compile time change the number of possible timescales and everything will just work.
@@ -2413,7 +2416,7 @@ void rt_graph_process(void) {
 void graph_init(void) {
 #ifndef SW102
   // Init graphs to empty
-  for (int i = 0; i < VARS_SIZE; i++) {
+  for (int i = 0; i < 1; i++) {
     for (int j = 0; j < 3; j++) {
       g_graphData[i][j].max_val = INT32_MIN;
       g_graphData[i][j].min_val = INT32_MAX;

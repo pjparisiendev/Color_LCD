@@ -23,4 +23,7 @@ rtc_time_t* rtc_get_time_since_startup(void);
 
 extern uint32_t ui32_seconds_since_startup;
 
+/* Platform RTC counter used by shared trip/statistics code. */
+uint32_t RTC_GetCounter(void);
+
 #endif /* _RTC_H_ */

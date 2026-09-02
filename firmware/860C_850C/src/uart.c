@@ -39,6 +39,12 @@ uint8_t* uart_get_tx_buffer(void)
  */
 void uart_send_tx_buffer(uint8_t *tx_buffer, uint8_t ui8_len)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  /* Inherited TSDZ2 packets are forbidden on the BBS02B target. */
+  (void)tx_buffer;
+  (void)ui8_len;
+#else
   // start DMA UART transfer
   usart1_start_dma_transfer(ui8_len);
+#endif
 }

@@ -3,15 +3,15 @@
 **
 **  File        : stm32_flash.ld
 **
-**  Abstract    : Linker script for STM32F103VB Device with
-**                128KByte FLASH, 20KByte RAM
+**  Abstract    : Development-only memory layout for the physically identified
+**                GD32F303RET6 (512 KiB flash, 64 KiB SRAM).
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
 **
 **                Set memory bank area and size if external memory is used.
 **
-**  Target      : STMicroelectronics STM32
+**  Target      : APT 850C GD32F303RET6 platform audit; NOT SAFE TO FLASH
 **
 **  Environment : Atollic TrueSTUDIO(R)
 **
@@ -42,10 +42,26 @@ _Min_Stack_Size = 0x100; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = DEFINED(USE_WITH_BOOTLOADER) ? (0x08000000 + 20K) : 0x08000000, LENGTH = DEFINED(USE_WITH_BOOTLOADER) ? (512K - 20K) : 512K
+  FLASH (rx)      : ORIGIN = DEFINED(USE_WITH_BOOTLOADER) ? (0x08000000 + 16K) : 0x08000000,
+                    LENGTH = (DEFINED(USE_WITH_BOOTLOADER) ? (512K - 16K) : 512K) -
+                             (DEFINED(RESERVE_SETTINGS_PAGES) ? 4K : 0K)
   RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 64K
   MEMORY_B1 (rx)  : ORIGIN = 0x60000000, LENGTH = 0K
 }
+
+ASSERT(ORIGIN(RAM) == 0x20000000, "unexpected GD32F303RET6 SRAM origin")
+ASSERT(LENGTH(RAM) == 64K, "unexpected GD32F303RET6 SRAM length")
+ASSERT(_estack == ORIGIN(RAM) + LENGTH(RAM), "stack top is outside SRAM")
+ASSERT((DEFINED(USE_WITH_BOOTLOADER) && ORIGIN(FLASH) == 0x08004000) ||
+       (!DEFINED(USE_WITH_BOOTLOADER) && ORIGIN(FLASH) == 0x08000000),
+       "unexpected application origin")
+_settings_flash_start = 0x0807F000;
+_settings_flash_end = 0x08080000;
+ASSERT((DEFINED(RESERVE_SETTINGS_PAGES) &&
+        ORIGIN(FLASH) + LENGTH(FLASH) == _settings_flash_start) ||
+       (!DEFINED(RESERVE_SETTINGS_PAGES) &&
+        ORIGIN(FLASH) + LENGTH(FLASH) == _settings_flash_end),
+       "unexpected application/settings flash boundary")
 
 /* Define output sections */
 SECTIONS
@@ -169,3 +185,9 @@ SECTIONS
 /*    libgcc.a ( * )*/
   }
 }
+
+ASSERT(SIZEOF(.isr_vector) > 0, "vector table is missing")
+ASSERT(_sidata + SIZEOF(.data) <= ORIGIN(FLASH) + LENGTH(FLASH),
+       "initialized data image exceeds flash")
+ASSERT(ADDR(._user_heap_stack) + SIZEOF(._user_heap_stack) <=
+       ORIGIN(RAM) + LENGTH(RAM), "static RAM, heap and stack exceed SRAM")

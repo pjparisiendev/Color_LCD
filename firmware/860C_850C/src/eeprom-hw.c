@@ -15,6 +15,12 @@
 #define EEPROM_START_ADDRESS_PAGE_0     0x0807F000
 #define EEPROM_START_ADDRESS_PAGE_1     0x0807F800 // last page of 2kbytes of flash memory
 
+#if defined(TARGET_APT_850C_GD32F303RET6)
+#if EEPROM_START_ADDRESS != 0x0807F000 || EEPROM_START_ADDRESS_PAGE_1 != 0x0807F800
+#error "GD32 settings pages must remain the final two 2 KiB flash pages"
+#endif
+#endif
+
 #define EEPROM_PAGE_KEY_ADDRESS         (1024 - 1)
 #define EEPROM_PAGE_WRITE_ID_ADDRESS    (EEPROM_PAGE_KEY_ADDRESS - 1)
 
@@ -34,6 +40,13 @@ void eeprom_hw_init() {
 // Set eeprom_page based on which page seems like it might be valid
 void find_valid_page()
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  /* Development target safety gate: never erase/program internal flash until
+   * the GD32F303 FMC path and the factory bootloader's reserved pages have
+   * both been verified. Settings remain volatile in this target. */
+  ui32_m_eeprom_page = 0;
+  return;
+#else
   // check if both EEPROM pages have invalid values and if so, write default values on page 0
   if((eeprom_read_from_page(EEPROM_PAGE_KEY_ADDRESS, 0) != EEPROM_MAGIC_KEY) &&
 	  (eeprom_read_from_page(EEPROM_PAGE_KEY_ADDRESS, 1) != EEPROM_MAGIC_KEY))
@@ -67,11 +80,17 @@ void find_valid_page()
   {
       ui32_m_eeprom_page = 1;
   }
+#endif
 }
 
 // Read raw EEPROM data, return false if it is blank or malformatted
 bool flash_read_words(void *dest, uint16_t length_words)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  (void) dest;
+  (void) length_words;
+  return false;
+#else
   uint8_t ui8_data;
 
   find_valid_page();
@@ -90,6 +109,7 @@ bool flash_read_words(void *dest, uint16_t length_words)
   }
 
   return true;
+#endif
 }
 
 static void eeprom_write_array(const uint8_t *p_array, uint32_t ui32_len)
@@ -104,6 +124,11 @@ static void eeprom_write_array(const uint8_t *p_array, uint32_t ui32_len)
 
 bool flash_write_words(const void *value, uint16_t length_words)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  (void) value;
+  (void) length_words;
+  return false;
+#else
   // cycle/increment ui32_eeprom_page, to next page
   ui32_m_eeprom_page = (ui32_m_eeprom_page + 1) % 2;
 
@@ -119,6 +144,7 @@ bool flash_write_words(const void *value, uint16_t length_words)
   eeprom_write(EEPROM_PAGE_WRITE_ID_ADDRESS, ui32_eeprom_write_id); // write new ID
 
   return true;
+#endif
 }
 
 uint8_t eeprom_read(uint32_t ui32_address)
@@ -135,6 +161,11 @@ uint8_t eeprom_read_from_page(uint32_t ui32_address, uint32_t ui32_eeprom_page)
 
 uint32_t eeprom_write(uint32_t ui32_address, uint8_t ui8_data)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  (void) ui32_address;
+  (void) ui8_data;
+  return 1;
+#else
   ui32_address = ((uint32_t) EEPROM_START_ADDRESS) + (ui32_m_eeprom_page * 2048) + (ui32_address * 2);
 
   FLASH_Unlock();
@@ -148,11 +179,16 @@ uint32_t eeprom_write(uint32_t ui32_address, uint8_t ui8_data)
   FLASH_Lock();
 
   return 0;
+#endif
 }
 
 void eeprom_erase_page(uint32_t ui32_eeprom_page)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  (void) ui32_eeprom_page;
+#else
   FLASH_Unlock();
   FLASH_ErasePage(((uint32_t) EEPROM_START_ADDRESS) + (ui32_eeprom_page * 2048));
   FLASH_Lock();
+#endif
 }

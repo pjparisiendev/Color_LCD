@@ -37,29 +37,48 @@ static void mainScreenOnEnter() {
 	editable_units_font = &SMALL_TEXT_FONT;
 }
 
+static void drawSpeedGaugeStatic(void) {
+  const int16_t cx = 160, cy = 145;
+  for (uint8_t i = 0; i < 24; i++) {
+    float angle1 = (155.0f + (230.0f * i / 24.0f)) * 3.1415926f / 180.0f;
+    float angle2 = (155.0f + (230.0f * (i + 1) / 24.0f)) * 3.1415926f / 180.0f;
+    UG_COLOR color = i < 12 ? C_GREEN : (i < 19 ? C_YELLOW : C_RED);
+    UG_DrawLine(cx + (int16_t)(cosf(angle1) * 101), cy + (int16_t)(sinf(angle1) * 101),
+                cx + (int16_t)(cosf(angle2) * 101), cy + (int16_t)(sinf(angle2) * 101), color);
+    UG_DrawLine(cx + (int16_t)(cosf(angle1) * 100), cy + (int16_t)(sinf(angle1) * 100),
+                cx + (int16_t)(cosf(angle2) * 100), cy + (int16_t)(sinf(angle2) * 100), color);
+  }
+  for (uint8_t i = 0; i <= 12; i++) {
+    float angle = (155.0f + (230.0f * i / 12.0f)) * 3.1415926f / 180.0f;
+    UG_DrawLine(cx + (int16_t)(cosf(angle) * 91), cy + (int16_t)(sinf(angle) * 91),
+                cx + (int16_t)(cosf(angle) * 98), cy + (int16_t)(sinf(angle) * 98), C_LIGHT_GRAY);
+  }
+}
+
 void mainScreenOnDirtyClean() {
   UG_FontSelect(&FONT_10X16);
   UG_SetBackcolor(C_BLACK);
-  UG_SetForecolor(MAIN_SCREEN_FIELD_LABELS_COLOR);
+  UG_SetForecolor(C_WHITE);
 
-  // main screen mask
-  // horizontal lines
-  UG_DrawLine(0, 33, 319, 33, MAIN_SCREEN_FIELD_LABELS_COLOR);
-  UG_DrawLine(0, 155, 319, 155, MAIN_SCREEN_FIELD_LABELS_COLOR);
-  UG_DrawLine(0, 235, 319, 235, MAIN_SCREEN_FIELD_LABELS_COLOR);
-  UG_DrawLine(0, 315, 319, 315, MAIN_SCREEN_FIELD_LABELS_COLOR);
-
-  // vertical line
-  UG_DrawLine(159, 156, 159, 314, MAIN_SCREEN_FIELD_LABELS_COLOR);
+  // Modern high-contrast dashboard surfaces.
+  UG_FillScreen(C_BLACK);
+  UG_FillRoundFrame(6, 5, 313, 36, 6, 0x1082);
+  UG_FillRoundFrame(6, 43, 313, 208, 9, 0x1082);
+  UG_FillRoundFrame(12, 220, 150, 272, 7, 0x18C3);
+  UG_FillRoundFrame(170, 220, 308, 272, 7, 0x18C3);
+  UG_FillRoundFrame(12, 288, 150, 340, 7, 0x18C3);
+  UG_FillRoundFrame(170, 288, 308, 340, 7, 0x18C3);
+  UG_FillRoundFrame(12, 358, 308, 449, 7, 0x1082);
+  drawSpeedGaugeStatic();
 
   // wheel speed
   if(ui_vars.ui8_units_type == 0)
   {
-    UG_PutString(265, 46 , "KM/H");
+    UG_PutString(254, 62 , "KM/H");
   }
   else
   {
-    UG_PutString(265, 46 , "MPH");
+    UG_PutString(254, 62 , "MPH");
   }
 
   // if street mode is enable, show ASSIST with regular color otherwise use orange color
@@ -80,17 +99,30 @@ void mainScreenOnDirtyClean() {
   // if fieldAlternate is enable, do not show ASSIST
   if ((fieldAlternate.rw->visibility == FieldTransitionVisible) ||
       (fieldAlternate.rw->visibility == FieldVisible)) {
-    UG_PutString(14, 46, "      ");
+    UG_PutString(20, 62, "      ");
   } else {
     UG_SetForecolor(assist_color);
-    UG_PutString(14, 46, "ASSIST");
+    UG_PutString(20, 62, "ASSIST");
   }
 }
 
 void mainScreenOnPostUpdate(void) {
+  static int16_t old_x1 = 160, old_y1 = 145, old_x2 = 160, old_y2 = 145;
+  static uint16_t old_speed_x10 = UINT16_MAX;
+  if (rt_vars.ui16_wheel_speed_x10 != old_speed_x10) {
+    old_speed_x10 = rt_vars.ui16_wheel_speed_x10;
+    float speed = old_speed_x10 / 10.0f;
+    if (speed > 60.0f) speed = 60.0f;
+    float angle = (155.0f + (230.0f * speed / 60.0f)) * 3.1415926f / 180.0f;
+    UG_DrawLine(old_x1, old_y1, old_x2, old_y2, 0x1082);
+    drawSpeedGaugeStatic();
+    old_x1 = 160 + (int16_t)(cosf(angle) * 82); old_y1 = 145 + (int16_t)(sinf(angle) * 82);
+    old_x2 = 160 + (int16_t)(cosf(angle) * 101); old_y2 = 145 + (int16_t)(sinf(angle) * 101);
+    UG_DrawLine(old_x1, old_y1, old_x2, old_y2, C_WHITE);
+  }
   // because printing numbers of wheel speed will make dirty the dot, always print it
   // wheel speed print dot
-  UG_FillFrame(257, 129, 263, 135, C_WHITE);
+  UG_FillRoundFrame(233, 128, 238, 133, 2, C_WHITE);
 }
 
 /**
@@ -140,8 +172,8 @@ Screen mainScreen1 = {
   .fields = {
     BATTERY_BAR,
     {
-      .x = 0, .y = 77,
-      .width = 91, .height = -1,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &assistLevelField,
       .font = &BIG_NUMBERS_TEXT_FONT,
       .label_align_x = AlignHidden,
@@ -151,8 +183,8 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = 2, .y = 76,
-      .width = 100, .height = 70  ,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &fieldAlternate,
       .font = &MEDIUM_NUMBERS_TEXT_FONT,
       .label_align_y = AlignTop,
@@ -163,8 +195,8 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = 132, .y = 56,
-      .width = 123, // 2 digits
+      .x = 88, .y = 60,
+      .width = 145, // 2 digits
       .height = 99,
       .field = &wheelSpeedIntegerField,
       .font = &HUGE_NUMBERS_TEXT_FONT,
@@ -176,8 +208,8 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = 266, .y = 78,
-      .width = 45, // 1 digit
+      .x = 240, .y = 87,
+      .width = 58, // 1 digit
       .height = 72,
       .field = &wheelSpeedDecimalField,
       .font = &BIG_NUMBERS_TEXT_FONT,
@@ -189,9 +221,9 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -201,9 +233,9 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -213,9 +245,9 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -225,9 +257,9 @@ Screen mainScreen1 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -235,11 +267,6 @@ Screen mainScreen1 = {
       .font = &MEDIUM_NUMBERS_TEXT_FONT,
       .label_align_y = AlignTop,
       .border = BorderNone,
-    },
-    {
-      .x = 0, .y = 322,
-      .width = SCREEN_WIDTH, .height = 136,
-      .field = &graph1,
     },
     STATUS_BAR,
     {
@@ -257,8 +284,8 @@ Screen mainScreen2 = {
   .fields = {
     BATTERY_BAR,
     {
-      .x = 0, .y = 77,
-      .width = 91, .height = -1,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &assistLevelField,
       .font = &BIG_NUMBERS_TEXT_FONT,
       .label_align_x = AlignHidden,
@@ -268,8 +295,8 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = 2, .y = 76,
-      .width = 100, .height = 70  ,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &fieldAlternate,
       .font = &MEDIUM_NUMBERS_TEXT_FONT,
       .label_align_y = AlignTop,
@@ -280,8 +307,8 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = 132, .y = 56,
-      .width = 123, // 2 digits
+      .x = 88, .y = 60,
+      .width = 145, // 2 digits
       .height = 99,
       .field = &wheelSpeedIntegerField,
       .font = &HUGE_NUMBERS_TEXT_FONT,
@@ -293,8 +320,8 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = 266, .y = 78,
-      .width = 45, // 1 digit
+      .x = 240, .y = 87,
+      .width = 58, // 1 digit
       .height = 72,
       .field = &wheelSpeedDecimalField,
       .font = &BIG_NUMBERS_TEXT_FONT,
@@ -306,9 +333,9 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -318,9 +345,9 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -330,9 +357,9 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -342,9 +369,9 @@ Screen mainScreen2 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -352,11 +379,6 @@ Screen mainScreen2 = {
       .font = &MEDIUM_NUMBERS_TEXT_FONT,
       .label_align_y = AlignTop,
       .border = BorderNone,
-    },
-    {
-      .x = 0, .y = 322,
-      .width = SCREEN_WIDTH, .height = 136,
-      .field = &graph2,
     },
     STATUS_BAR,
     {
@@ -374,8 +396,8 @@ Screen mainScreen3 = {
   .fields = {
     BATTERY_BAR,
     {
-      .x = 0, .y = 77,
-      .width = 91, .height = -1,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &assistLevelField,
       .font = &BIG_NUMBERS_TEXT_FONT,
       .label_align_x = AlignHidden,
@@ -385,8 +407,8 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = 2, .y = 76,
-      .width = 100, .height = 70  ,
+      .x = 12, .y = 88,
+      .width = 78, .height = 72,
       .field = &fieldAlternate,
       .font = &MEDIUM_NUMBERS_TEXT_FONT,
       .label_align_y = AlignTop,
@@ -397,8 +419,8 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = 132, .y = 56,
-      .width = 123, // 2 digits
+      .x = 88, .y = 60,
+      .width = 145, // 2 digits
       .height = 99,
       .field = &wheelSpeedIntegerField,
       .font = &HUGE_NUMBERS_TEXT_FONT,
@@ -410,8 +432,8 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = 266, .y = 78,
-      .width = 45, // 1 digit
+      .x = 240, .y = 87,
+      .width = 58, // 1 digit
       .height = 72,
       .field = &wheelSpeedDecimalField,
       .font = &BIG_NUMBERS_TEXT_FONT,
@@ -423,9 +445,9 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -435,9 +457,9 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 161,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 220,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -447,9 +469,9 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 12, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -459,9 +481,9 @@ Screen mainScreen3 = {
       .border = BorderNone,
     },
     {
-      .x = XbyEighths(4) + 1, .y = 240,
-      .width = XbyEighths(4) - 4,
-      .height = 72,
+      .x = 170, .y = 288,
+      .width = 137,
+      .height = 52,
       .align_x = AlignCenter,
       .inset_y = 12,
       .inset_x = 0,
@@ -470,11 +492,6 @@ Screen mainScreen3 = {
       .label_align_y = AlignTop,
       .border = BorderNone,
     },
-    {
-      .x = 0, .y = 322,
-      .width = SCREEN_WIDTH, .height = 136,
-      .field = &graph3,
-    },
     STATUS_BAR,
     {
       .field = NULL
@@ -482,9 +499,25 @@ Screen mainScreen3 = {
   }
 };
 
+Screen mainScreen4 = {
+  .onPress = mainScreenOnPress,
+  .onEnter = mainScreenOnEnter,
+  .onDirtyClean = mainScreenOnDirtyClean,
+  .fields = {
+    BATTERY_BAR,
+    {
+      .x = 12, .y = 58,
+      .width = 296, .height = 385,
+      .field = &graph1,
+    },
+    STATUS_BAR,
+    { .field = NULL }
+  }
+};
+
 
 // Screens in a loop, shown when the user short presses the power button
-Screen *screens[] = { &mainScreen1, &mainScreen2, &mainScreen3, NULL };
+Screen *screens[] = { &mainScreen1, &mainScreen2, &mainScreen3, &mainScreen4, NULL };
 
 // Show our battery graphic
 void battery_display() {

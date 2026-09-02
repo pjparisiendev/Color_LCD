@@ -21,6 +21,7 @@
 #include "rtc.h"
 #include "fonts.h"
 #include "state.h"
+#include "timers.h"
 #include "ugui_driver/ugui_display_8x0c.h"
 
 // Battery SOC symbol:
@@ -71,6 +72,12 @@ void power_off_management(void)
 
 void lcd_set_backlight_intensity(uint8_t ui8_intensity)
 {
+  if (ui8_intensity == 0U)
+  {
+    timer3_set_compare(0U);
+    return;
+  }
+
   ui8_intensity /= 5;
 
   // force to be min of 5% and max of 100%
@@ -83,7 +90,7 @@ void lcd_set_backlight_intensity(uint8_t ui8_intensity)
     ui8_intensity = 20;
   }
 
-  TIM_SetCompare2(TIM3, ((uint16_t) ui8_intensity) * 2000);
+  timer3_set_compare(((uint16_t) ui8_intensity) * 2000);
 }
 
 

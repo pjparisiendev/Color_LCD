@@ -13,6 +13,9 @@
 #include "utils.h"
 #include "screen.h"
 #include "rtc.h"
+#ifndef SW102
+#include "stm32f10x_rtc.h"
+#endif
 #include "fonts.h"
 #include "uart.h"
 #include "mainscreen.h"
@@ -244,7 +247,8 @@ Field graph3 = FIELD_CUSTOMIZABLE(&ui_vars.graphs_field_selectors[2],
   &pwmDutyGraph,
   &motorFOCGraph);
 
-Field *graphs[3] = { &graph1, &graph2, &graph3 }; // 3 graphs, each one for each main screen
+/* All four pages use the same selector/cache; only page 4 renders it. */
+Field *graphs[4] = { &graph1, &graph1, &graph1, &graph1 };
 #endif
 
 Field *activeGraphs = NULL; // set only once graph data is safe to read

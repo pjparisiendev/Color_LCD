@@ -21,6 +21,9 @@
 #include "state.h"
 #include "adc.h"
 #include "timer.h"
+#include "protocol.h"
+#include "tsdz2_protocol.h"
+#include "instrumentation.h"
 #include <stdlib.h>
 #ifdef SW102
 #include "ble_services.h"
@@ -847,10 +850,15 @@ void communications(void) {
 
   const uint8_t *p_rx_buffer = uart_get_rx_buffer_rdy();
 
+  if (p_rx_buffer)
+    protocol_telemetry_note_valid_rx();
+
   // process rx package if we are simulating or the UART had a packet
   if ((g_motor_init_state == MOTOR_INIT_SIMULATING) || p_rx_buffer) {
-    if (g_motor_init_state == MOTOR_INIT_SIMULATING)
+    if (g_motor_init_state == MOTOR_INIT_SIMULATING) {
       parse_simmotor();
+      protocol_telemetry_note_valid_rx();
+    }
     else if (p_rx_buffer) {
       // now process rx data
       ui8_frame = (frame_type_t) p_rx_buffer[2];
@@ -949,7 +957,10 @@ void communications(void) {
 // Note: this called from ISR context every 100ms
 void rt_processing(void)
 {
+  protocol_telemetry_tick_100ms();
+#ifndef TARGET_APT_850C_GD32F303RET6
   communications();
+#endif
 
 #ifdef SW102
   send_bluetooth(&rt_vars);
@@ -958,7 +969,9 @@ void rt_processing(void)
   // called here because this state machine for motor_init should run every 100ms
   // montor init processing must be done when exiting the configurations menu
   // once motor is initialized, this should take almost no processing time
+#ifndef TARGET_APT_850C_GD32F303RET6
   motor_init();
+#endif
 
   /************************************************************************************************/
   // now do all the calculations that must be done every 100ms
@@ -973,6 +986,42 @@ void rt_processing(void)
   /************************************************************************************************/
   rt_first_time_management();
   rt_calc_battery_soc();
+
+#ifndef TARGET_APT_850C_GD32F303RET6
+  tsdz2_telemetry_input_t telemetry = {
+    .speed_x10_kph = rt_vars.ui16_wheel_speed_x10,
+    .battery_voltage_x10 = rt_vars.ui16_battery_voltage_filtered_x10,
+    .battery_current_x10 = rt_vars.ui16_battery_current_filtered_x5 * 2,
+    .battery_power_w = rt_vars.ui16_battery_power_filtered,
+    .motor_temperature_c = rt_vars.ui8_motor_temperature,
+    .assist_level = rt_vars.ui8_assist_level,
+    .throttle_percent = rt_vars.ui8_throttle,
+    .brake_active = rt_vars.ui8_braking,
+    .error_code = rt_vars.ui8_error_states,
+    .temperature_valid = rt_vars.ui8_temperature_limit_feature_enabled != 0,
+    .throttle_valid = rt_vars.ui8_temperature_limit_feature_enabled == 0,
+    .simulated = g_motor_init_state == MOTOR_INIT_SIMULATING,
+  };
+  tsdz2_protocol_publish_telemetry(&telemetry);
+#endif
+
+  uint32_t remaining_energy_x10_wh =
+      rt_vars.ui32_wh_x10_100_percent > rt_vars.ui32_wh_x10
+          ? rt_vars.ui32_wh_x10_100_percent - rt_vars.ui32_wh_x10
+          : 0;
+  instrumentation_update_100ms(
+      rt_vars.ui16_battery_power_filtered,
+      rt_vars.ui16_battery_current_filtered_x5 * 2,
+      rt_vars.ui16_wheel_speed_x10,
+      rt_vars.ui8_motor_temperature,
+#ifdef TARGET_APT_850C_GD32F303RET6
+      false,
+#else
+      telemetry.temperature_valid,
+#endif
+      protocol_telemetry_is_fresh(),
+      rt_vars.ui32_trip_a_distance_x1000,
+      remaining_energy_x10_wh);
 }
 
 void prepare_torque_sensor_calibration_table(void) {

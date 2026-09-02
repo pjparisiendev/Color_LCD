@@ -31,32 +31,42 @@ static uint32_t ui32_m_clear_event = 0;
 buttons_events_t buttons_events = 0;
 
 #if defined(DISPLAY_850C) || defined(DISPLAY_860C)
+#ifdef TARGET_APT_850C_GD32F303RET6
+#include "gd32f30x_gpio.h"
+#define BUTTON_UP_INPUT()    gpio_input_bit_get(GPIOC, GPIO_PIN_11)
+#define BUTTON_DOWN_INPUT()  gpio_input_bit_get(GPIOA, GPIO_PIN_15)
+#define BUTTON_ONOFF_INPUT() gpio_input_bit_get(GPIOC, GPIO_PIN_12)
+#else
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "pins.h"
+#define BUTTON_UP_INPUT()    GPIO_ReadInputDataBit(BUTTON_UP__PORT, BUTTON_UP__PIN)
+#define BUTTON_DOWN_INPUT()  GPIO_ReadInputDataBit(BUTTON_DOWN__PORT, BUTTON_DOWN__PIN)
+#define BUTTON_ONOFF_INPUT() GPIO_ReadInputDataBit(BUTTON_ONOFF__PORT, BUTTON_ONOFF__PIN)
+#endif
 
 uint32_t buttons_get_up_state(void) {
 	if (ui_vars.ui8_buttons_up_down_invert) {
-		return GPIO_ReadInputDataBit(BUTTON_DOWN__PORT, BUTTON_DOWN__PIN) != 0 ?
+		return BUTTON_DOWN_INPUT() != 0 ?
 				0 : 1;
 	} else {
-		return GPIO_ReadInputDataBit(BUTTON_UP__PORT, BUTTON_UP__PIN) != 0 ?
+		return BUTTON_UP_INPUT() != 0 ?
 				0 : 1;
 	}
 }
 
 uint32_t buttons_get_down_state(void) {
 	if (ui_vars.ui8_buttons_up_down_invert) {
-		return GPIO_ReadInputDataBit(BUTTON_UP__PORT, BUTTON_UP__PIN) != 0 ?
+		return BUTTON_UP_INPUT() != 0 ?
 				0 : 1;
 	} else {
-		return GPIO_ReadInputDataBit(BUTTON_DOWN__PORT, BUTTON_DOWN__PIN) != 0 ?
+		return BUTTON_DOWN_INPUT() != 0 ?
 				0 : 1;
 	}
 }
 
 uint32_t buttons_get_onoff_state(void) {
-	return GPIO_ReadInputDataBit(BUTTON_ONOFF__PORT, BUTTON_ONOFF__PIN) != 0 ?
+	return BUTTON_ONOFF_INPUT() != 0 ?
 			0 : 1;
 }
 

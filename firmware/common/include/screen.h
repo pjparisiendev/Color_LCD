@@ -528,7 +528,9 @@ extern bool screenConvertPounds;
 extern variables_t g_vars[VARS_SIZE];  // this is needed to be used on configurations otherwise I could not make code build
 #ifndef SW102
 extern GraphVars g_graphVars[VARS_SIZE]; // this is needed to be used on configurations otherwise I could not make code build
-extern GraphData g_graphData[VARS_SIZE][3];
+/* One cache shared by the dedicated graph page. Changing the selected metric
+ * clears history instead of reserving history for every hidden metric. */
+extern GraphData g_graphData[1][3];
 #endif
 
 void fieldPrintf(Field *field, const char *fmt, ...);

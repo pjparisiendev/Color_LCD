@@ -29,8 +29,14 @@
 #include "mainscreen.h"
 #include "configscreen.h"
 #include "ugui_driver/ugui_display_8x0c.h"
+#include "bafang_runtime.h"
+#ifdef TARGET_APT_850C_GD32F303RET6
+#include "gd32_runtime.h"
+#endif
 
+#ifndef TARGET_APT_850C_GD32F303RET6
 void SetSysClockTo128Mhz(void);
+#endif
 void adc_init();
 
 int main(void)
@@ -38,19 +44,41 @@ int main(void)
   volatile uint32_t ui32_timer_base_counter_1ms;
   volatile uint32_t ui32_ms_loop_counter_1;
 
-  SetSysClockTo128Mhz();
+#ifndef TARGET_APT_850C_GD32F303RET6
+  SetSysClockTo104Mhz();
+#endif
+#ifdef TARGET_APT_850C_GD32F303RET6
+  gd32_platform_early_init();
+#else
   RCC_APB1PeriphResetCmd(RCC_APB1Periph_WWDG, DISABLE);
-
-  // if building for original bootloader (from manufacturer), relocate flash after 20K (0x5000) that is the space that bootloader uses
+  /* Preserve the APT bootloader region on legacy bootloader builds. */
 #ifdef USE_WITH_BOOTLOADER
-  NVIC_SetVectorTable(NVIC_VectTab_FLASH, (uint32_t) 0x5000);
+  NVIC_SetVectorTable(NVIC_VectTab_FLASH, (uint32_t) 0x4000);
+#endif
 #endif
 
   pins_init();
-  adc_init();
   system_power(1);
+#ifdef LCD_BRINGUP_DIAGNOSTIC
+  timer3_init();
+  lcd_init();
+  while (1)
+  {
+    volatile uint32_t delay;
+    UG_FillScreen(C_RED);
+    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    UG_FillScreen(C_GREEN);
+    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    UG_FillScreen(C_BLUE);
+    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    UG_FillScreen(C_WHITE);
+    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+  }
+#endif
+  adc_init();
   systick_init();
   usart1_init();
+  bafang_runtime_init();
   eeprom_init();
   rtc_init();
   timer3_init(); // drives LCD backlight
@@ -69,6 +97,10 @@ int main(void)
     {
       ui32_ms_loop_counter_1 = ui32_timer_base_counter_1ms;
 
+#ifdef TARGET_APT_850C_GD32F303RET6
+      bafang_runtime_tick(20U);
+#endif
+
       // next 2 lines takes about 11ms to execute (main menu). Measured on 2019.03.04.
       main_idle();
       continue;
@@ -76,6 +108,7 @@ int main(void)
   }
 }
 
+#ifndef TARGET_APT_850C_GD32F303RET6
 void SetSysClockTo128Mhz(void)
 {
   ErrorStatus HSEStartUpStatus;
@@ -108,7 +141,7 @@ void SetSysClockTo128Mhz(void)
     RCC_PCLK1Config(RCC_HCLK_Div2);
 
     /* PLLCLK = 8MHz * 16 = 128 MHz */
-    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_16);
+    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_13);
 
     /* Enable PLL */
     RCC_PLLCmd(ENABLE);
@@ -136,3 +169,4 @@ void SetSysClockTo128Mhz(void)
     }
   }
 }
+#endif

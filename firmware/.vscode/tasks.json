@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build 850C UI preview",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/simulator/ColorLcdSimulator.csproj"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Run 850C UI preview",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/simulator/ColorLcdSimulator.csproj"
+      ],
+      "dependsOn": "Build 850C UI preview",
+      "problemMatcher": []
+    }
+  ]
+}

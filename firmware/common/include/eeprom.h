@@ -186,11 +186,15 @@ void eeprom_init_defaults(void);
 // EEPROM memory variables default values
 #define DEFAULT_VALUE_ASSIST_LEVEL                                  0
 #define DEFAULT_VALUE_NUMBER_OF_ASSIST_LEVELS                       20
+#ifdef TARGET_APT_850C_GD32F303RET6
+#define DEFAULT_VALUE_WHEEL_PERIMETER                               2160 // confirmed target setting: 28-inch wheel
+#else
 #define DEFAULT_VALUE_WHEEL_PERIMETER                               2100 // 27.5'' wheel: 2100mm perimeter
+#endif
 #define DEFAULT_VALUE_WHEEL_MAX_SPEED                               50
 #define DEFAULT_VALUE_UNITS_TYPE                                    0 // 0 = km/h
 #define DEFAULT_VALUE_WH_X10_OFFSET                                 0
-#define DEFAULT_VALUE_HW_X10_100_PERCENT                            4000 // default to a battery of 400 Wh
+#define DEFAULT_VALUE_HW_X10_100_PERCENT                            8400 // Green Pedel target: 48 V, 17.5 Ah, 840 Wh
 #define DEAFULT_VALUE_SHOW_NUMERIC_BATTERY_SOC                      1 // SOC
 #define DEAFULT_VALUE_TIME_FIELD                                    1 // 1 i show clock
 #define DEFAULT_VALUE_BATTERY_MAX_CURRENT                           16 // 16 amps

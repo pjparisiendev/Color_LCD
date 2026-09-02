@@ -27,6 +27,29 @@ ifeq ($(DISPLAY_VERSION), 850C_BOOTLOADER)
   DISPLAY_VERSION_DEFINED = yes
 endif
 
+# Confirmed Green Pedel E2.3 hardware. This target intentionally retains the
+# APT 16 KiB application offset proven by an official-tool virtual capture,
+# while the historical F103 compatibility layer
+# is audited against the official GD32F303 CMSIS/peripheral library.
+ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
+  CFLAGS += -DDISPLAY_850C -DTARGET_APT_850C_GD32F303RET6 -DGD32F30X_HD -DCONTROLLER_TX_LOCKED
+  BOOTLOADER = yes
+  TARGET_LFLAGS = -Xlinker --defsym=RESERVE_SETTINGS_PAGES=1
+  TARGET_CPU = cortex-m4
+  TARGET_CMSIS_INCLUDES = -I./gd32f30x_cmsis/Include -I./gd32f30x_cmsis/Core
+  TARGET_SYSTEM_SOURCE = gd32f30x_cmsis/system_gd32f30x.c gd32f30x_cmsis/gd32f30x_adc.c gd32f30x_cmsis/gd32f30x_dma.c gd32f30x_cmsis/gd32f30x_gpio.c gd32f30x_cmsis/gd32f30x_misc.c gd32f30x_cmsis/gd32f30x_rcu.c gd32f30x_cmsis/gd32f30x_timer.c gd32f30x_cmsis/gd32f30x_usart.c
+  TARGET_STARTUP_OBJECT = startup_gd32f30x_hd.o
+  DISPLAY_VERSION_DEFINED = yes
+  $(warning DEVELOPMENT ONLY: GD32F303 peripheral/pin audit incomplete; NOT SAFE TO FLASH)
+endif
+
+TARGET_CPU ?= cortex-m3
+TARGET_STARTUP_OBJECT ?= startup_stm32f10x_md.o
+
+ifeq ($(LCD_DIAGNOSTIC), yes)
+  CFLAGS += -DLCD_BRINGUP_DIAGNOSTIC
+endif
+
 ifeq ($(DISPLAY_VERSION), 860C_BOOTLOADER)
   CFLAGS += -DDISPLAY_860C
   BOOTLOADER = yes
@@ -41,6 +64,9 @@ else
   endif
   ifeq ($(DISPLAY_VERSION), 860C_BOOTLOADER)
   $(info WARNING | using display version: 860C_BOOTLOADER)
+  endif
+  ifeq ($(DISPLAY_VERSION), APT_850C_GD32F303RET6)
+  $(info WARNING | target: APT_850C_GD32F303RET6 at validated APT offset 0x4000)
   endif
 endif
 
@@ -75,14 +101,15 @@ OPT = 0
 # -mfix-cortex-m3-ldrd should be enabled by default for Cortex M3.
 # CFLAGS -H show header files
 
-AFLAGS  = -I./GD32F10x_standard_peripheral/Include -I -Ispl/CMSIS -Ispl/inc -c -g -mcpu=cortex-m3 -mthumb -l libgcc
-CFLAGS  += -I./GD32F10x_standard_peripheral/Include -I./ -I./spl/CMSIS -I./spl/CMSIS/inc -I./spl/inc -DUSE_FULL_ASSERT -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER -c -fno-common -O$(OPT) -g -mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections -l libgcc 
+AFLAGS  = -I./GD32F10x_standard_peripheral/Include -Ispl/CMSIS -Ispl/inc -c -g -mcpu=$(TARGET_CPU) -mthumb
+CFLAGS  += $(TARGET_CMSIS_INCLUDES) -I./GD32F10x_standard_peripheral/Include -I. -I./spl/CMSIS -I./spl/CMSIS/inc -I./spl/inc -DUSE_FULL_ASSERT -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER -c -fno-common -O$(OPT) -g -mcpu=$(TARGET_CPU) -mthumb -mfloat-abi=soft -ffunction-sections -fdata-sections
 # Need following option for LTO as LTO will treat retarget functions as
 # unused without following option
 CFLAGS += -fno-builtin
-CFLAGS += -std=c99 --specs=nano.specs --specs=nosys.specs -Wall  -I../../common/include
+CFLAGS += -std=c99 --specs=nano.specs --specs=nosys.specs -Wall  -I../../common/include -I../../common/protocol
 
-LFLAGS  += -Tstm32_flash.ld -L/usr/lib/gcc/arm-none-eabi/4.9.3/armv7-m -lgcc -lm -nostartfiles -lnosys -mcpu=cortex-m3 -mthumb -Wl,--gc-sections
+LFLAGS  += -Tstm32_flash.ld -lgcc -lm -nostartfiles -lnosys -mcpu=$(TARGET_CPU) -mthumb -mfloat-abi=soft -Wl,--gc-sections
+LFLAGS  += $(TARGET_LFLAGS)
 
 LFLAGS += --specs=nano.specs --specs=nosys.specs # to use newlib nano
 LFLAGS += -Xlinker -Map=main.map
@@ -94,10 +121,17 @@ ODFLAGS = -S
 include ../../common/Makefile.common
 
 COMMONDIR = ../../common/src
+PROTOCOLDIR = ../../common/protocol
 OBJDIR = _build
 CUSTOM_SOURCES=$(shell find spl ugui_driver *.c -type f -iname '*.c') 
+ifneq ($(TARGET_SYSTEM_SOURCE),)
+# A GD32F303 target must never silently link an STM32F10x peripheral or CMSIS
+# implementation. Native GD32 sources above provide every required facility.
+CUSTOM_SOURCES := $(filter-out spl/CMSIS/%.c spl/src/%.c,$(CUSTOM_SOURCES)) $(TARGET_SYSTEM_SOURCE)
+endif
 COMMON_SOURCES = fault.c buttons.c utils.c ugui.c fonts.c state.c screen.c mainscreen.c configscreen.c eeprom.c
-SOURCES = $(CUSTOM_SOURCES) $(foreach x, $(COMMON_SOURCES), $(COMMONDIR)/$(x))
+PROTOCOL_SOURCES = protocol.c tsdz2_protocol.c bafang_protocol.c range_estimator.c instrumentation.c
+SOURCES = $(CUSTOM_SOURCES) $(foreach x, $(COMMON_SOURCES), $(COMMONDIR)/$(x)) $(foreach x, $(PROTOCOL_SOURCES), $(PROTOCOLDIR)/$(x))
 OBJECTS = $(foreach x, $(basename $(SOURCES)), $(OBJDIR)/$(x).o)
 
 # dev platform specific.
@@ -120,25 +154,16 @@ test:
 clean: 
 	rm -f main.lst main.elf main.bin
 	rm -rf $(OBJDIR) .deps
+	rm -f ../common/src/*.o ../common/protocol/*.o
 
-flash_serial: main.bin 
-	$(STM32FLASH) main.bin
-
-# before using this unlock cpu with
-# > stm32f1x unlock 0
-# stm32f1x unlocked.
-# INFO: a reset or power cycle is required for the new settings to take effect.
-flash_jtag: main.bin
-	$(OPENOCD) -c "init; reset halt; sleep 500; stm32f1x mass_erase 0; flash write_bank 0 main.bin 0; shutdown"
-
-run_jtag: flash_jtag
-	$(OPENOCD) -c "init; reset halt; reset run; shutdown"
+flash_serial flash_jtag run_jtag:
+	$(error DISABLED: physical programming is prohibited until recovery and the E2.3 platform are verified)
 
 # Just start an openocd session
 openocd:
 	$(OPENOCD) 
 
-size:
+size: main.elf
 	@echo "Size:"
 	$(SIZE) main.elf
 
@@ -147,12 +172,15 @@ main.bin: main.elf
 	$(CP) $(CPFLAGS) main.elf main.bin
 	$(OD) $(ODFLAGS) main.elf > main.lst
 
-main.elf: $(OBJECTS) startup_stm32f10x_md.o
+main.elf: $(OBJECTS) $(TARGET_STARTUP_OBJECT)
 	@echo "..linking"
 	$(LD)  $^ $(LFLAGS) -o $@
 
 startup_stm32f10x_md.o:
 	$(AS) $(ASFLAGS) startup_stm32f10x_md.s -o startup_stm32f10x_md.o
+
+startup_gd32f30x_hd.o: gd32f30x_cmsis/startup_gd32f30x_hd.S
+	$(CC) $(CFLAGS) -x assembler-with-cpp $< -o $@
 
 #
 # The following makefile magic generates proper dependencies for headerfiles, so that if you change a headerfile

@@ -13,10 +13,11 @@
 
 #ifdef DISPLAY_860C
 #define SYSTEM_POWER_ON_OFF__PORT                   GPIOA
-#define SYSTEM_POWER_ON_OFF__PIN                    GPIO_Pin_11
+#define SYSTEM_POWER_ON_OFF__PIN                    GPIO_PIN_11
 #endif
 
-#ifdef DISPLAY_850C
+//#ifdef DISPLAY_850C
+#ifdef DISPLAY_850C_LF60
 #define SYSTEM_POWER_ON_OFF__PORT                   GPIOC
 #define SYSTEM_POWER_ON_OFF__PIN                    GPIO_Pin_1
 #endif

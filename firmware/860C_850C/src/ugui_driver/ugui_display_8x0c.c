@@ -33,6 +33,19 @@
 #include "../pins.h"
 #include "../timers.h"
 
+#ifdef TARGET_APT_850C_GD32F303RET6
+#include "../gd32_lcd_bus.h"
+#define lcd_pin_set(port, pin) gd32_lcd_pin_set((uintptr_t)(port), (pin))
+#define lcd_pin_reset(port, pin) gd32_lcd_pin_reset((uintptr_t)(port), (pin))
+#define lcd_bus_write(value) gd32_lcd_bus_write((uint16_t)(value))
+#define lcd_bus_read() gd32_lcd_bus_read()
+#else
+#define lcd_pin_set(port, pin) ((port)->BSRR = (pin))
+#define lcd_pin_reset(port, pin) ((port)->BRR = (pin))
+#define lcd_bus_write(value) (LCD_BUS__PORT->ODR = (uint16_t)(value))
+#define lcd_bus_read() ((uint16_t)LCD_BUS__PORT->IDR)
+#endif
+
 #define HDP (DISPLAY_WIDTH - 1)
 #define VDP (DISPLAY_HEIGHT - 1)
 
@@ -98,6 +111,10 @@ lcd_IC_t detect_lcd_type()
 }
 
 lcd_IC_t display_8x0C_lcd_init(void) {
+#ifdef TARGET_APT_850C_GD32F303RET6
+    /* Keep SWD enabled; disable only the full JTAG port to release PB3/PB4. */
+    gd32_lcd_bus_init();
+#else
     // next step is needed to have PB3 and PB4 working as GPIO
     /* Disable the Serial Wire Jtag Debug Port SWJ-DP */
     GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
@@ -132,18 +149,20 @@ lcd_IC_t display_8x0C_lcd_init(void) {
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_Init(LCD_BUS__PORT, &GPIO_InitStructure);
+#endif
     
     // disable reset
-    GPIO_SetBits(LCD_RESET__PORT, LCD_RESET__PIN);
+    lcd_pin_set(LCD_RESET__PORT, LCD_RESET__PIN);
     
     // default to write mode
-    GPIO_SetBits(LCD_READ__PORT, LCD_READ__PIN);
+    lcd_pin_set(LCD_READ__PORT, LCD_READ__PIN);
     
     // keep chip select active
-    GPIO_ResetBits(LCD_CHIP_SELECT__PORT, LCD_CHIP_SELECT__PIN);
+    lcd_pin_reset(LCD_CHIP_SELECT__PORT, LCD_CHIP_SELECT__PIN);
     
     lcd_IC_t type = LCD_Unknown;
-#ifdef DISPLAY_850C
+//#ifdef DISPLAY_850C
+#ifdef DISPLAY_850C_LF60
     // Configure ILI9481 display
     // borrowed from https://github.com/Bodmer/TFT_HX8357_Due/blob/master/TFT_HX8357_Due.cpp as a starting point
     type = detect_lcd_type();
@@ -622,9 +641,9 @@ void wait_pulse() {
 }
 
 void lcd_write_cycle() {
-    GPIOC->BRR = LCD_WRITE__PIN;
+    lcd_pin_reset(LCD_WRITE__PORT, LCD_WRITE__PIN);
     wait_pulse();
-    GPIOC->BSRR = LCD_WRITE__PIN;
+    lcd_pin_set(LCD_WRITE__PORT, LCD_WRITE__PIN);
     
     // FIXME, total write cycle min time is 100ns, we are probably fine, but nothing is currently guaranteeing it
 }
@@ -677,10 +696,10 @@ UG_RESULT HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2,
     
     lcd_write_command(0x2c); // write data to BUS
     
-    LCD_COMMAND_DATA__PORT->BSRR = LCD_COMMAND_DATA__PIN; // data
+    lcd_pin_set(LCD_COMMAND_DATA__PORT, LCD_COMMAND_DATA__PIN); // data
     
     // set the color only once since is equal to all pixels
-    LCD_BUS__PORT->ODR = ui32_color;
+    lcd_bus_write(ui32_color);
     
     while (ui32_pixels-- > 0) {
         lcd_write_cycle();
@@ -723,15 +742,15 @@ void lcd_write_command(uint16_t ui32_command) {
 #endif
     
     // command
-    LCD_COMMAND_DATA__PORT->BRR = LCD_COMMAND_DATA__PIN;
+    lcd_pin_reset(LCD_COMMAND_DATA__PORT, LCD_COMMAND_DATA__PIN);
     
     // write data to BUS
-    LCD_BUS__PORT->ODR = ui32_command;
+    lcd_bus_write(ui32_command);
     
     lcd_write_cycle();
     
     // data
-    LCD_COMMAND_DATA__PORT->BSRR = LCD_COMMAND_DATA__PIN;
+    lcd_pin_set(LCD_COMMAND_DATA__PORT, LCD_COMMAND_DATA__PIN);
 }
 
 void lcd_write_data_8bits(uint16_t ui32_data) {
@@ -739,7 +758,7 @@ void lcd_write_data_8bits(uint16_t ui32_data) {
     // LCD_COMMAND_DATA__PORT->BSRR = LCD_COMMAND_DATA__PIN;
     
     // write data to BUS
-    LCD_BUS__PORT->ODR = ui32_data;
+    lcd_bus_write(ui32_data);
     
     // pulse low WR pin
     lcd_write_cycle();
@@ -751,28 +770,36 @@ void lcd_read_data_16bits(uint16_t command, uint16_t *out, int numtoread) {
     lcd_write_command(command);
     
     // Make data pins inputs
+#ifdef TARGET_APT_850C_GD32F303RET6
+    gd32_lcd_bus_input();
+#else
     GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Pin = 0xffff;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_Init(LCD_BUS__PORT, &GPIO_InitStructure);
+#endif
     
     while (numtoread--) {
-        LCD_READ__PORT->BRR = LCD_READ__PIN; // drive from high to low (as an open drain output)
+        lcd_pin_reset(LCD_READ__PORT, LCD_READ__PIN);
         
         delay_ms(2); // min 340ns delay needed before reading
         
         // Now the data should be valid for reading
-        *out++ = (uint16_t) LCD_BUS__PORT->IDR;
+        *out++ = lcd_bus_read();
         
-        LCD_READ__PORT->BSRR = LCD_READ__PIN; // raise read high (LCD will stop driving data lines)
+        lcd_pin_set(LCD_READ__PORT, LCD_READ__PIN);
         
         delay_ms(2); // min 250ns of read high needed per datasheet
     }
     
     // Make data pins outputs again
+#ifdef TARGET_APT_850C_GD32F303RET6
+    gd32_lcd_bus_output();
+#else
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
+#endif
 }
 
 uint16_t *getLcdDevcode()
