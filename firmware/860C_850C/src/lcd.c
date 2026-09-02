@@ -23,10 +23,10 @@
 #include "state.h"
 #include "timers.h"
 #include "ugui_driver/ugui_display_8x0c.h"
+#ifdef TARGET_APT_850C_GD32F303RET6
+#include "lcd_lf60.h"
+#endif
 
-// Battery SOC symbol:
-// 10 bars, each bar: with = 7, height = 24
-// symbol has contour lines of 1 pixel
 #define BATTERY_SOC_START_X 8
 #define BATTERY_SOC_START_Y 4
 #define BATTERY_SOC_BAR_WITH 7
@@ -47,15 +47,20 @@ void power_off_management(void);
 void lcd_power_off(uint8_t updateDistanceOdo);
 void power_off_management(void);
 
-/* Place your initialization/startup code here (e.g. MyInst_Start()) */
 void lcd_init(void)
 {
+#ifdef TARGET_APT_850C_GD32F303RET6
+  /* Do not run the historical LB60/ILI9481 autodetection path on the E2.3
+   * target. Use the exact LF60 sequence copied from the working BIKEL 850C.
+   */
+  g_lcd_ic_type = lcd_lf60_init();
+#else
   g_lcd_ic_type = display_8x0C_lcd_init();
+#endif
   UG_FillScreen(C_BLACK);
 
-  set_lcd_backlight(); // default to at least some backlight
+  set_lcd_backlight();
 }
-
 
 void power_off_management(void)
 {
@@ -68,8 +73,6 @@ void power_off_management(void)
   }
 }
 
-
-
 void lcd_set_backlight_intensity(uint8_t ui8_intensity)
 {
   if (ui8_intensity == 0U)
@@ -80,7 +83,6 @@ void lcd_set_backlight_intensity(uint8_t ui8_intensity)
 
   ui8_intensity /= 5;
 
-  // force to be min of 5% and max of 100%
   if(ui8_intensity < 1)
   {
     ui8_intensity = 1;
@@ -93,34 +95,20 @@ void lcd_set_backlight_intensity(uint8_t ui8_intensity)
   timer3_set_compare(((uint16_t) ui8_intensity) * 2000);
 }
 
-
-
-
 void lcd_power_off(uint8_t updateDistanceOdo)
 {
-  // save current battery Wh
   ui_vars.ui32_wh_x10_offset = ui_vars.ui32_wh_x10;
-
-  // save the variables on EEPROM
   eeprom_write_variables ();
 
-  // put screen all black and disable backlight
   UG_FillScreen(0);
   lcd_set_backlight_intensity(0);
 
-  // now disable the power to all the system
   system_power(0);
 
-  // block here
   while(1) ;
 }
-
-
-
-
 
 volatile lcd_vars_t* get_lcd_vars(void)
 {
   return &m_lcd_vars;
 }
-
