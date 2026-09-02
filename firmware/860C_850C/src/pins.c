@@ -15,10 +15,11 @@
 #include "pins.h"
 #endif
 #include "stdio.h"
+#include "adc.h"
+
+#define MIN_BATTERY_VOLTAGE 300U
 
 #ifdef TARGET_APT_850C_GD32F303RET6
-/* Static E2.3 candidate pin-map conflict checks. Physical confirmation is
- * still required, but accidental software overlap now fails the build. */
 #define PA_OUTPUTS (GPIO_PIN_3 | GPIO_PIN_7 | GPIO_PIN_9)
 #define PA_INPUTS  (GPIO_PIN_4 | GPIO_PIN_10 | GPIO_PIN_15)
 #define PC_OUTPUTS (GPIO_PIN_1 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7)
@@ -37,22 +38,26 @@ void pins_init (void)
   rcu_periph_clock_enable(RCU_GPIOC);
   rcu_periph_clock_enable(RCU_AF);
 
-  /* Preload safe levels before changing output modes. PC1 holds display power;
-   * USB charging remains off until system_power() explicitly enables it. */
-  gpio_bit_set(GPIOC, GPIO_PIN_1);
-  gpio_bit_reset(GPIOA, GPIO_PIN_3);
+  /* Match the physically working BIKEL 850C startup exactly here: PC1 is
+   * configured as the system-power output and is initially driven LOW.
+   * main() waits 500 ms and system_power(1) then creates the required LOW->HIGH
+   * transition on the latch. Preloading PC1 HIGH prevented that transition. */
   gpio_init(GPIOC, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_1);
+  gpio_bit_reset(GPIOC, GPIO_PIN_1);
+
   gpio_init(GPIOC, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_2MHZ, GPIO_PIN_12);
   gpio_init(GPIOC, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_2MHZ, GPIO_PIN_11);
   gpio_init(GPIOA, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_2MHZ, GPIO_PIN_15);
+
   gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_7);
+
   gpio_init(GPIOA, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_3);
+  gpio_bit_reset(GPIOA, GPIO_PIN_3);
 #else
-  // enable clocks
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA |
                          RCC_APB2Periph_GPIOB |
                          RCC_APB2Periph_GPIOC |
-						 RCC_APB2Periph_ADC1 |
+                         RCC_APB2Periph_ADC1 |
                          RCC_APB2Periph_AFIO,
                          ENABLE);
 
@@ -62,6 +67,7 @@ void pins_init (void)
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
   GPIO_Init(SYSTEM_POWER_ON_OFF__PORT, &GPIO_InitStructure);
+  GPIO_ResetBits(SYSTEM_POWER_ON_OFF__PORT, SYSTEM_POWER_ON_OFF__PIN);
 
   GPIO_InitStructure.GPIO_Pin = BUTTON_ONOFF__PIN;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
@@ -99,11 +105,31 @@ void pins_init (void)
 
 void system_power(uint32_t ui32_state)
 {
+  uint16_t batteryVoltage = 0U;
+
   if(ui32_state)
   {
 #ifdef TARGET_APT_850C_GD32F303RET6
     gpio_bit_set(GPIOC, GPIO_PIN_1);
-    gpio_bit_set(GPIOA, GPIO_PIN_3);
+
+    /* BIKEL delays before deciding whether to enable the USB-charge rail and
+     * only enables it with a valid battery voltage. Keep PA3 out of the basic
+     * power-latch operation. */
+    for (uint32_t i = 0U; i < 1000000U; i++)
+    {
+      __NOP();
+    }
+
+    batteryVoltage = battery_voltage_10x_get();
+    batteryVoltage = battery_voltage_10x_get();
+    if (batteryVoltage > MIN_BATTERY_VOLTAGE)
+    {
+      gpio_bit_set(GPIOA, GPIO_PIN_3);
+    }
+    else
+    {
+      gpio_bit_reset(GPIOA, GPIO_PIN_3);
+    }
 #else
     GPIO_SetBits(SYSTEM_POWER_ON_OFF__PORT, SYSTEM_POWER_ON_OFF__PIN);
     GPIO_SetBits(USB_CHARGE__PORT, USB_CHARGE__PIN);
