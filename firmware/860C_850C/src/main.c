@@ -43,6 +43,14 @@ int main(void)
   volatile uint32_t ui32_timer_base_counter_1ms;
   volatile uint32_t ui32_ms_loop_counter_1 = 0U;
 
+#if defined(POWER_LATCH_TEST) && defined(TARGET_APT_850C_GD32F303RET6)
+  /* This path intentionally runs before gd32_platform_early_init(), SysTick,
+   * ADC, LCD, UART, EEPROM, timers, and the normal application. Reaching the
+   * blinking backlight proves the bootloader/vector/startup/SystemInit/main
+   * path and the PC1 power-hold GPIO are alive. */
+  power_latch_test_run();
+#endif
+
 #ifdef TARGET_APT_850C_GD32F303RET6
   gd32_platform_early_init();
 #else
