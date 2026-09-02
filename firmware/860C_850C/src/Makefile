@@ -65,7 +65,8 @@ CFLAGS += -DUSE_WITH_BOOTLOADER
 LFLAGS = -Xlinker --defsym=USE_WITH_BOOTLOADER=1
 endif
 
-TCPREFIX  = $(TCPREFIX)gcc
+TCPREFIX  = arm-none-eabi-
+CC      = $(TCPREFIX)gcc
 AS      = $(TCPREFIX)as
 LD      = $(TCPREFIX)gcc -v
 CP      = $(TCPREFIX)objcopy
