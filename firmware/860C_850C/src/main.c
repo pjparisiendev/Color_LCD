@@ -21,7 +21,6 @@
 #include "timers.h"
 #include "timer.h"
 #include "usart1.h"
-#include "eeprom.h"
 #include "ugui.h"
 #include "utils.h"
 #include "rtc.h"
@@ -42,41 +41,41 @@ void adc_init();
 int main(void)
 {
   volatile uint32_t ui32_timer_base_counter_1ms;
-  volatile uint32_t ui32_ms_loop_counter_1;
+  volatile uint32_t ui32_ms_loop_counter_1 = 0U;
 
-#ifndef TARGET_APT_850C_GD32F303RET6
-  SetSysClockTo104Mhz();
-#endif
 #ifdef TARGET_APT_850C_GD32F303RET6
   gd32_platform_early_init();
 #else
+  SetSysClockTo128Mhz();
   RCC_APB1PeriphResetCmd(RCC_APB1Periph_WWDG, DISABLE);
-  /* Preserve the APT bootloader region on legacy bootloader builds. */
 #ifdef USE_WITH_BOOTLOADER
-  NVIC_SetVectorTable(NVIC_VectTab_FLASH, (uint32_t) 0x4000);
+  NVIC_SetVectorTable(NVIC_VectTab_FLASH, (uint32_t) 0x5000);
 #endif
 #endif
 
+  /* Follow the startup order used by the known-working BIKEL 850C firmware. */
+  systick_init();
   pins_init();
+  delay_ms(500);
+  adc_init();
   system_power(1);
+
 #ifdef LCD_BRINGUP_DIAGNOSTIC
   timer3_init();
   lcd_init();
   while (1)
   {
-    volatile uint32_t delay;
     UG_FillScreen(C_RED);
-    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    delay_ms(1000);
     UG_FillScreen(C_GREEN);
-    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    delay_ms(1000);
     UG_FillScreen(C_BLUE);
-    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    delay_ms(1000);
     UG_FillScreen(C_WHITE);
-    for (delay = 0; delay < 8000000U; delay++) { __NOP(); }
+    delay_ms(1000);
   }
 #endif
-  adc_init();
-  systick_init();
+
   usart1_init();
   bafang_runtime_init();
   eeprom_init();
@@ -90,10 +89,8 @@ int main(void)
 
   while(1)
   {
-    // because of continue; at the end of each if code block that will stop the while (1) loop there,
-    // the first if block code will have the higher priority over any others
     ui32_timer_base_counter_1ms = get_time_base_counter_1ms();
-    if((ui32_timer_base_counter_1ms - ui32_ms_loop_counter_1) > 20) // every 20ms
+    if((ui32_timer_base_counter_1ms - ui32_ms_loop_counter_1) > 20)
     {
       ui32_ms_loop_counter_1 = ui32_timer_base_counter_1ms;
 
@@ -101,7 +98,6 @@ int main(void)
       bafang_runtime_tick(20U);
 #endif
 
-      // next 2 lines takes about 11ms to execute (main menu). Measured on 2019.03.04.
       main_idle();
       continue;
     }
@@ -113,57 +109,31 @@ void SetSysClockTo128Mhz(void)
 {
   ErrorStatus HSEStartUpStatus;
 
-  /* SYSCLK, HCLK, PCLK2 and PCLK1 configuration -----------------------------*/
-  /* RCC system reset(for debug purpose) */
   RCC_DeInit();
-
-  /* Enable HSE */
   RCC_HSEConfig(RCC_HSE_ON);
-
-  /* Wait till HSE is ready */
   HSEStartUpStatus = RCC_WaitForHSEStartUp();
 
   if (HSEStartUpStatus == SUCCESS)
   {
-    /* Enable Prefetch Buffer */
     FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
-
-    /* Flash 2 wait state */
     FLASH_SetLatency(FLASH_Latency_2);
-
-    /* HCLK = SYSCLK */
     RCC_HCLKConfig(RCC_SYSCLK_Div1);
-
-    /* PCLK2 = HCLK */
     RCC_PCLK2Config(RCC_HCLK_Div1);
-
-    /* PCLK1 = HCLK/2 */
     RCC_PCLK1Config(RCC_HCLK_Div2);
-
-    /* PLLCLK = 8MHz * 16 = 128 MHz */
-    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_13);
-
-    /* Enable PLL */
+    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_16);
     RCC_PLLCmd(ENABLE);
 
-    /* Wait till PLL is ready */
     while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
     {
     }
 
-    /* Select PLL as system clock source */
     RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-
-    /* Wait till PLL is used as system clock source */
     while(RCC_GetSYSCLKSource() != 0x08)
     {
     }
   }
   else
-  { /* If HSE fails to start-up, the application will have wrong clock configuration.
-       User can add here some code to deal with this error */
-
-    /* Go to infinite loop */
+  {
     while (1)
     {
     }
