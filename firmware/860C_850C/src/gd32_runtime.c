@@ -43,9 +43,12 @@ void gd32_platform_early_init(void)
 
   rcu_periph_reset_disable(RCU_WWDGTRST);
 
-  /* The BIKEL 1.1 850C binary physically works on this exact HMI and its
-   * linker configuration places the raw application's vector table here. */
-  SCB->VTOR = 0x08005000U;
+  /* Our APT flasher writes byte zero of every raw image to 0x08004000.
+   * Therefore the application must be linked and vector-relocated to the
+   * same address unless the image is explicitly padded/relocated by the
+   * flasher. Green Pedel boots successfully through this 0x4000 contract.
+   */
+  SCB->VTOR = 0x08004000U;
   __DSB();
   __ISB();
 }
